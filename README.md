@@ -12,7 +12,7 @@ Just import annoplot and use one of the functions
 
 `import annoplot as aplt`
 
-annoplot in the background just calls matplotlib standard functions, thus it's possible to pass in all arguments normally used in the default functions.
+annoplot in the background just calls matplotlib standard functions, thus it's possible to pass in all arguments normally used in the default functions (as keyword arguments, positional arguments won't work).
 
 ## Examples
 
