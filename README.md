@@ -16,7 +16,7 @@ annoplot in the background just calls matplotlib standard functions, thus it's p
 
 ## Examples
 
-```
+```python
 aplt.plot(np.random.rand(1000), np.random.randn(1000), annotations=np.repeat('Point inside a useless plot', 1000), plotstyle='*')
 
 # Additional customisations can then be added normally
