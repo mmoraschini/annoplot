@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+import datetime
 
 class Annotator(ABC):
     def __init__(self, ax, annmarkerfacecolor, annfacecolor, annedgecolor):
@@ -163,13 +166,18 @@ class PlotAnnotator(Annotator):
                     ylim = self.ax.get_ylim()
                     x_range = xlim[1] - xlim[0]
                     y_range = ylim[1] - ylim[0]
-                    for x, y, a in self.data:
+                    for i,d in enumerate(self.data):
+                        x, y, a = d
+                        if isinstance(x, datetime.datetime):
+                            x = mdates.date2num(x)
+                        if isinstance(y, datetime.datetime):
+                            y = mdates.date2num(y)
+                        
                         dist = self.distance(x/x_range, clickX/x_range, y/y_range, clickY/y_range)
                         if dist < min_dist:
-                            annotation = (x, y, a)
+                            annotation = d
                             min_dist = dist
                             i_min = i
-                        i+=1
                     
                     x,y,a = annotation
                     self.draw_annotation(event.inaxes, x, y, a)
@@ -205,8 +213,14 @@ class PlotAnnotator(Annotator):
         
         self.clear_annotations()
         
+        if isinstance(x, datetime.datetime):
+            x = mdates.date2num(x)
+        if isinstance(y, datetime.datetime):
+            y = mdates.date2num(y)
+        
         t = ax.text(x+deltax, y+deltay, '{}'.format(annotation),
                     bbox={'facecolor':self.annfacecolor, 'edgecolor':self.annedgecolor})
+        
         m = ax.scatter([x], [y], marker='s', c=self.annmarkerfacecolor, zorder=100)
         self.drawn_annotations[(x, y)] = (t, m)
         self.ax.figure.canvas.draw_idle()
@@ -269,7 +283,17 @@ def plot(x, y=None, annotations=None, fig=None, subplotargs=None, fmt=None, **kw
     
     annotation_strings = ['' for i in range(len(x))]
     for i in range(len(x)):
-        annotation_strings[i] = '{:.4f}, {:.4f}'.format(x[i], y[i])
+        
+        if isinstance(x[i], float):
+            format_x = '{:.4f}'.format(x[i])
+        else:
+            format_x = '{}'.format(x[i])
+        if isinstance(y[i], float):
+            format_y = '{:.4f}'.format(y[i])
+        else:
+            format_y = '{}'.format(y[i])
+        
+        annotation_strings[i] = format_x + ', ' + format_y
         if annotations is not None:
             annotation_strings[i] = annotation_strings[i] + '\n{}'.format(annotations[i])
     
