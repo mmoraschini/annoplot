@@ -1,5 +1,5 @@
 # annoplot
-This module lets you draw annotated plots with matplotlib
+This module lets you draw clickable, interactive and annotated plots with matplotlib
 
 ## Features
 The final behaviour is similar to plotting with Matlab®, you can click on the plotting area and get information about the nearest point. It is also possible to move around with arrows, provided that the mouse is inside the plotting area.
