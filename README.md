@@ -22,3 +22,5 @@ aplt.plot(np.random.rand(1000), np.random.randn(1000), annotations=np.repeat('Po
 # Additional customisations can then be added normally
 plt.title('Useless plot')
 ```
+
+![Plot example](images/plot_example.png?raw=true "plot example")
