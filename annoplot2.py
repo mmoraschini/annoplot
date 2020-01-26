@@ -1,21 +1,8 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 import datetime
-
-
-def _manage_kwargs(kwargs):
-    extra_args = {}
-    available_args = ['annmarkerfacecolor', 'annfacecolor', 'annedgecolor']
-    for arg in available_args:
-        if arg in kwargs:
-            extra_args[arg] = kwargs[arg]
-            del kwargs[arg]
-
-    return extra_args
 
 
 def distance(x1, x2, y1, y2):
@@ -25,33 +12,33 @@ def distance(x1, x2, y1, y2):
     return abs(x1 - x2) + abs(y1 - y2)
 
 
-def annotate(annotations=None, fig=None, **kwargs):
-    # If no figure is specified take the last one
+def annotate(annotations=None, fig=None,
+             annmarkerfacecolor: str = 'r', annfacecolor: str = 'w', annedgecolor: str = 'k'):
+    # If no figure is specified take the last one. We don't want to use plt.gcf() because if there are no open figures
+    # it opens a new empty one
     if fig is None:
         try:
             fig = plt.figure(plt.get_fignums()[-1])
         except IndexError:
-            raise(IndexError('There are no open figures'))
-
-    extra_args = _manage_kwargs(kwargs)
+            raise (IndexError('There are no open figures'))
 
     axes = fig.get_axes()
     if type(annotations) is not dict:
         if len(axes) == 1:
             annotations = {axes[0]: annotations}
         else:
-            raise(RuntimeError('If the figure has more than 1 axis you need to pass in a dictionary, mapping'
-                               'each axis to the corresponding annotations'))
+            raise (RuntimeError('If the figure has more than 1 axis you need to pass in a dictionary, mapping '
+                                'each axis to the corresponding annotations'))
     else:
         if len(annotations) != len(axes):
             raise (RuntimeError('There must be a list of annotations for each axis'))
 
-    antr = PlotAnnotator(annotations, fig, **extra_args)
+    antr = Annotator(annotations, fig, annmarkerfacecolor, annfacecolor, annedgecolor)
     fig.canvas.mpl_connect('button_press_event', antr)
     fig.canvas.mpl_connect('key_press_event', antr)
 
 
-class Annotator(ABC):
+class Annotator:
     def __init__(self, annotations, fig, annmarkerfacecolor: str, annfacecolor: str, annedgecolor: str):
         self.annotations = annotations
         self.fig = fig
@@ -59,46 +46,46 @@ class Annotator(ABC):
         self.annfacecolor = annfacecolor
         self.annedgecolor = annedgecolor
 
-        self.drawn_annotation = None
-        self.shown = None
-
-    def clear_shown_element(self):
-        self.shown = None
-
-    def clear_annotation(self):
-        if self.drawn_annotation is not None:
-            self.drawn_annotation[0].remove()
-            self.drawn_annotation[1].remove()
-            self.clear_shown_element()
-
-        self.drawn_annotation = None
-        self.fig.canvas.draw_idle()
-
-
-class PlotAnnotator(Annotator):
-
-    def __init__(self, annotations, fig, annmarkerfacecolor='r', annfacecolor='w', annedgecolor='k'):
-        Annotator.__init__(self, annotations, fig, annmarkerfacecolor, annfacecolor, annedgecolor)
+        self.drawn_annotation = {}
+        self.shown = {}
+        for ax in fig.get_axes():
+            self.shown[ax] = None
+            self.drawn_annotation[ax] = None
 
     def __call__(self, event):
         ax = event.inaxes
-
-        axis_annotations = self.annotations[ax]
-
         if ax is None:
             ax = plt.gca()
 
-        if event.name == 'button_press_event':
-            click_x = event.xdata
-            click_y = event.ydata
+        click_x = event.xdata
+        click_y = event.ydata
 
+        if event.name == 'button_press_event' and (click_x is None or click_y is None):
+            return
+
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+
+        arguments = [ax, click_x, click_y, x_range, y_range]
+
+        if len(ax.lines) > 0 and len(ax.images) == 0:
+            self._manage_plot(event, arguments)
+        elif len(ax.lines) == 0 and len(ax.images) > 0:
+            pass
+        else:
+            raise (RuntimeError('Annotations can only be added to an Axis that either contains Lines or Images'))
+
+    def _manage_plot(self, event, arguments):
+
+        ax, click_x, click_y, x_range, y_range = arguments
+
+        axis_annotations = self.annotations[ax]
+
+        if event.name == 'button_press_event':
             min_idx = None
             min_dist = np.inf
-
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            x_range = xlim[1] - xlim[0]
-            y_range = ylim[1] - ylim[0]
 
             annotation = None
             lines = ax.lines
@@ -121,64 +108,70 @@ class PlotAnnotator(Annotator):
                             annotation = [x, y, None]
                         min_dist = dist
                         min_idx = (i, j)
-            try:
-                x, y, a = annotation
-                self.draw_annotation(ax, x, y, a)
-                self.shown = min_idx
-            except TypeError:
-                pass
+
+            x, y, a = annotation
+            self._draw_annotation(ax, x, y, a)
+            self.shown[ax] = min_idx
 
         elif event.name == 'key_press_event':
-            shown = self.shown
-            if self.shown is None:
+            bkup_shown = self.shown[ax]
+            if self.shown[ax] is None:
                 return
 
-            i, j = self.shown
+            i, j = self.shown[ax]
             line = ax.lines[i]
+
+            delta = 0
             if event.key == 'left':
                 if j == 0:
                     return
-                x = line.get_xdata()[j - 1]
-                y = line.get_ydata()[j - 1]
-                try:
-                    annotation = [x, y, axis_annotations[i][j - 1]]
-                except IndexError:
-                    annotation = [x, y, None]
-                self.draw_annotation(ax, x, y, annotation)
-                self.shown = (shown[0], shown[1] - 1)
+                delta = -1
             elif event.key == 'right':
                 if j == line.get_xdata().size - 1:
                     return
-                x = line.get_xdata()[j + 1]
-                y = line.get_ydata()[j + 1]
-                try:
-                    annotation = [x, y, axis_annotations[i][j + 1]]
-                except IndexError:
-                    annotation = [x, y, None]
-                self.draw_annotation(ax, x, y, annotation)
-                self.shown = (shown[0], shown[1] + 1)
+                delta = 1
             elif event.key == 'escape' or event.key == 'delete':
-                self.clear_annotation()
+                self._clear_annotation(ax)
+                return
 
-    def draw_annotation(self, ax, x, y, annotation):
+            x = line.get_xdata()[j + delta]
+            y = line.get_ydata()[j + delta]
+            try:
+                a = axis_annotations[i][j + delta]
+            except IndexError:
+                a = None
+
+            self._draw_annotation(ax, x, y, a)
+            self.shown[ax] = (bkup_shown[0], bkup_shown[1] + delta)
+
+    def _draw_annotation(self, ax, x, y, annotation):
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
 
         deltax = (xlim[1] - xlim[0]) / 50
         deltay = (ylim[1] - ylim[0]) / 50
 
-        self.clear_annotation()
+        self._clear_annotation(ax)
 
         if annotation is not None:
-            text = f'{x:.4f}, {y:.4f}\n{annotation}'
+            text = '{:.4f}, {:.4f}\n{}'.format(x, y, annotation)
         else:
-            text = f'{x:.4f}, {y:.4f}'
+            text = '{:.4f}, {:.4f}'.format(x, y)
 
         t = ax.text(x + deltax, y + deltay, text, bbox={'facecolor': self.annfacecolor, 'edgecolor': self.annedgecolor})
 
         m = ax.scatter([x], [y], marker='s', c=self.annmarkerfacecolor, zorder=100)
-        self.drawn_annotation = (t, m)
+        self.drawn_annotation[ax] = (t, m)
 
         ax.figure.canvas.draw_idle()
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
+
+    def _clear_annotation(self, ax):
+        if self.drawn_annotation[ax] is not None:
+            self.drawn_annotation[ax][0].remove()
+            self.drawn_annotation[ax][1].remove()
+            self.shown[ax] = None
+            self.drawn_annotation[ax] = None
+
+        self.fig.canvas.draw_idle()
