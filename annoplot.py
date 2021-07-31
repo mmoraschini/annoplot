@@ -1,6 +1,5 @@
 from typing import Optional, Union, Dict, List, Any
 import datetime
-import collections
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,9 +35,9 @@ def annotate(annotations: Optional[AnnotationsType] = None, fig: Optional[Figure
         axes and the values the annotations.
     @param fig: the figure on which to show annotations. If None takes the last one opened. If there are no open
         figures raises an error.
-    @param annmarkerfacecolor: the colour of the marker
-    @param annfacecolor: the background colour of the box
-    @param annedgecolor: the edge colour of the box
+    @param annmarkerfacecolor: the color of the marker
+    @param annfacecolor: the background color of the box
+    @param annedgecolor: the edge color of the box
     """
     # If no figure is specified take the last one. We don't want to use plt.gcf() because if there are no open figures
     # it opens a new empty one
@@ -67,6 +66,12 @@ def annotate(annotations: Optional[AnnotationsType] = None, fig: Optional[Figure
 
 
 def _is_arraylike(x: Any) -> bool:
+    """
+    Return True if the argument is a list, a tuple or a numpy array
+
+    @param x: a python variable
+    @return: True if the argument is a list, a tuple or a numpy array, else False
+    """
 
     if isinstance(x, (list, tuple, np.ndarray)):
         return True
@@ -77,6 +82,8 @@ def _is_arraylike(x: Any) -> bool:
 class Annotator:
     """
     A class to show an annotation next to the point of a plot nearest to the click and move around with arrows.
+    The annotation will show the location of the point and, if the annotations parameter is passed and the plot is
+    a line, some additional information.
 
     Right: next point
     Left: previous point
@@ -84,11 +91,11 @@ class Annotator:
 
     @param annotations: a list, a list of list or a dict containing the annotations. A list of lists is used if
         there are multiple plots on the same axis, a dictionary if there are more axes. The keys of the dictionary
-        must be the axes and the values the annotations
+        must be the axes and the values the annotations. Works  only with plots drawn with plt.plot
     @param fig: the figure on which to show annotations
-    @param annmarkerfacecolor: the colour of the marker
-    @param annfacecolor: the background colour of the box
-    @param annedgecolor: the edge colour of the box
+    @param annmarkerfacecolor: the color of the marker
+    @param annfacecolor: the background color of the box
+    @param annedgecolor: the edge color of the box
     """
     def __init__(self, annotations: AnnotationsType, fig: Figure,
                  annmarkerfacecolor: str, annfacecolor: str, annedgecolor: str):
@@ -137,6 +144,14 @@ class Annotator:
                                 'Histograms, Boxplots but not a mixture of them'))
 
     def _manage_plot(self, event, arguments, plot_type):
+        """
+        Manages the response to button and key press events
+
+        @param event: the nae of the event
+        @param arguments: the arguments in the order: axis, x position of the event, y position of the event,
+            x dimension of the axis, y dimension of the axis
+        @param plot_type: the type of the plot, can be line, image or patch
+        """
 
         ax, click_x, click_y, x_range, y_range = arguments
 
@@ -189,6 +204,17 @@ class Annotator:
                 self._draw_annotation(ax, x, y, a)
 
     def _manage_key_press(self, ax, data, i, j, key, plot_type) -> Union[None, tuple]:
+        """
+        Manage the event of the user pressing a key
+
+        @param ax: the axis
+        @param data: the x and y positions
+        @param i: the x-index of the point to annotate
+        @param j: the y-index of the point to annotate
+        @param key: the key pressed
+        @param plot_type: the type of the plot, can be line, image or patch
+        @return: the x and y positions of the annotated plot and eventually the extra annotation to add
+        """
         x, y, a = (None, None, None)
         if key == 'left':
             if plot_type == 'image':
@@ -251,6 +277,13 @@ class Annotator:
         return x, y, a
 
     def _get_iterable_data(self, ax, plot_type):
+        """
+        Get the data to be iterated on, depending on the plot type
+
+        @param ax: the axis
+        @param plot_type: the type of the plot, can be line, image or patch
+        @return: the data tht can be iterated on to sequentially show the annotations
+        """
 
         data = None
         if plot_type == 'line':
@@ -273,6 +306,14 @@ class Annotator:
         return data
 
     def _draw_annotation(self, ax, x, y, annotation):
+        """
+        Draws an annotation at the specified position in the specified axis
+
+        @param ax: the axis where to draw the annotation on
+        @param x: the x axis of the point
+        @param y: the y axis of the point
+        @param annotation: the additional text to display, beside the position of the point
+        """
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
 
@@ -323,6 +364,11 @@ class Annotator:
         ax.set_ylim(ylim)
 
     def _clear_annotation(self, ax):
+        """
+        Clear all drawn annotations from the axis
+
+        @param ax: a matplotlib axis
+        """
         if self.drawn_annotation[ax] is not None:
             self.drawn_annotation[ax][0].remove()
             self.drawn_annotation[ax][1].remove()
